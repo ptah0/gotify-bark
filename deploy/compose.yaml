@@ -1,0 +1,11 @@
+services:
+
+  gotify-bark:
+    image: ptah0/gotify-bark
+    container_name: gotify-bark
+    restart: unless-stopped
+    environment:
+      - APP_GOTIFY_URL=wss://gotify.example.com
+      - APP_GOTIFY_KEY=__GOTIFY_CLIENT_KEY__
+      - APP_BARK_URL=https://api.day.app
+      - APP_BARK_DEVICE=__OBTAIN_FROM_BARK_APP__
