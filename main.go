@@ -34,7 +34,7 @@ func main() {
 			&cli.StringFlag{
 				Name:    "bark-url",
 				Aliases: []string{"b"},
-				Value:   "api.day.app",
+				Value:   "https://api.day.app",
 				Usage:   "Gotify server URL",
 				EnvVars: []string{"APP_BARK_URL"},
 			},
