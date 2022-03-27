@@ -5,7 +5,6 @@ package core // Package core import "github.com/ptah0/gotify-bark/core"
 import (
 	"bytes"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/goccy/go-json"
 	"github.com/gorilla/websocket"
+	"github.com/rs/zerolog/log"
 )
 
 type Config struct {
@@ -24,35 +24,33 @@ type Config struct {
 }
 
 func Run(cfg *Config) {
-	log.SetFlags(0)
-	// print out values
-	log.Println("Starting!")
-	log.Printf("Gotify URL: %s, Key: %s\n", cfg.GotifyUrl, cfg.GotifyKey)
-	log.Printf("Bark URL: %s, Devices: %s\n", cfg.BarkUrl, cfg.BarkDevices)
-	//log.Println("Gotify URL:", gUrl)
-	//log.Println("Gotify Key:", gKey)
-	//log.Println("Bark URL:", bUrl)
-	//log.Println("Bark Devices:", bDevices)
+	// Print out values
+	log.Info().
+		Str("GotifyUrl", cfg.GotifyUrl).
+		Str("GotifyKey", cfg.GotifyKey).
+		Str("BarkUrl", cfg.BarkUrl).
+		Strs("BarkDevices", cfg.BarkDevices).
+		Msg("Read Config")
 
-	// handle os interrupt
+	// Handle os interrupt
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
-	// create url
+	// Create url
 	u, err := url.Parse(cfg.GotifyUrl)
 	if err != nil {
-		log.Fatal("gUrl:", err)
+		log.Error().Err(err).Msg("Invalid Gotify Url")
 		return
 	}
 	u.Path = "/stream"
 	q := url.Values{}
 	q.Set("token", cfg.GotifyKey)
 	u.RawQuery = q.Encode()
-	// init websocket
-	log.Printf("connecting to %s", u.String())
+	// Init websocket
+	log.Debug().Msgf("connecting to %s", u.String())
 	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
-		log.Fatal("dial:", err)
+		log.Fatal().Err(err).Msg("dial")
 	}
 	defer c.Close()
 
@@ -62,10 +60,10 @@ func Run(cfg *Config) {
 		for {
 			_, m, err := c.ReadMessage()
 			if err != nil {
-				log.Println("read:", err)
+				log.Debug().Err(err).Msg("read")
 				return
 			}
-			log.Printf("recv: %s", m)
+			log.Debug().Bytes("Msg", m).Msg("recv")
 			// forward request to Bark
 			for _, d := range cfg.BarkDevices {
 				sendPush(m, cfg.BarkUrl, d)
@@ -78,13 +76,13 @@ func Run(cfg *Config) {
 		case <-done:
 			return
 		case <-interrupt:
-			log.Println("interrupt")
+			log.Info().Msg("interrupt")
 
 			// Cleanly close the connection by sending a close message and then
 			// waiting (with timeout) for the server to close the connection.
 			err := c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 			if err != nil {
-				log.Println("write close:", err)
+				log.Info().Err(err).Msg("write close")
 				return
 			}
 			select {
@@ -96,49 +94,49 @@ func Run(cfg *Config) {
 	}
 }
 
-func sendPush(msg []byte, u string, d string) {
-	// convert msg: Gotify -> Bark
-	json := convertMsg(msg, d)
-	log.Printf("send: %s", json)
+func sendPush(msg []byte, barkUrl string, dev string) {
+	// Convert msg: Gotify -> Bark
+	out := convertMsg(msg, dev)
+	log.Debug().Bytes("json", out).Msg("send")
 
-	// create client
+	// Create client
 	client := &http.Client{}
 
-	// create url
-	url, err := url.Parse(u)
+	// Create url
+	u, err := url.Parse(barkUrl)
 	if err != nil {
-		log.Fatal("bark Url:", err)
+		log.Fatal().Err(err).Msg("Bark Url Invalid")
 		return
 	}
-	url.Path = "/push"
-	// request
-	req, err := http.NewRequest("POST", url.String(), bytes.NewBuffer(json))
+	u.Path = "/push"
+	// Request
+	req, err := http.NewRequest("POST", u.String(), bytes.NewBuffer(out))
 	if err != nil {
-		log.Println("Failure : ", err)
+		log.Error().Err(err).Msg("Failure to POST")
 		return
 	}
-	// headers
+	// Headers
 	req.Header.Add("Content-Type", "application/json; charset=utf-8")
 
-	// fetch request
-	res, err := client.Do(req)
+	// Fetch request
+	resp, err := client.Do(req)
 	if err != nil {
-		log.Println("Failure : ", err)
+		log.Warn().Err(err).Msg("Failure to fetch request")
 		return
 	}
-	// read response Body
-	body, _ := ioutil.ReadAll(res.Body)
+	// Read response Body
+	body, _ := ioutil.ReadAll(resp.Body)
 
 	// handle error
-	switch res.StatusCode {
+	switch resp.StatusCode {
 	case 400:
-		log.Fatal("Bad Request : ", string(body))
+		log.Error().Str("body", string(body)).Msg("Bad Request")
 	}
 
 	// display results
-	log.Println("response Status : ", res.Status)
-	//log.Println("response Headers : ", res.Header)
-	log.Println("response Body : ", string(body))
+	log.Info().Msgf("response Status : ", resp.Status)
+	log.Debug().Msgf("response Headers : ", resp.Header)
+	log.Debug().Msgf("response Body : ", string(body))
 }
 
 type GotifyMsg struct {
@@ -157,13 +155,13 @@ type BarkMsg struct {
 }
 
 func convertMsg(m []byte, d string) []byte {
-	// parse Gotify msg
+	// Parse Gotify msg
 	var in GotifyMsg
 	err := json.Unmarshal(m, &in)
 	if err != nil {
-		log.Println("Failure: ", err)
+		log.Warn().Err(err).Msg("Parse Gotify message")
 	}
-	// Bark msg
+	// Gen Bark msg
 	out, err := json.Marshal(&BarkMsg{
 		DeviceKey: d,
 		Category:  "category",
@@ -172,7 +170,7 @@ func convertMsg(m []byte, d string) []byte {
 		Badge:     int(1),
 	})
 	if err != nil {
-		log.Println("Failure : ", err)
+		log.Warn().Err(err).Msg("Generate Bark message")
 	}
 
 	return out
