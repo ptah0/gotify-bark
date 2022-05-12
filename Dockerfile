@@ -6,7 +6,7 @@ RUN apk --no-cache add build-base git
 WORKDIR /app
 COPY . ./
 # Build
-RUN go get
+RUN go mod download
 RUN go build -v -o main
 
 # Run Image
