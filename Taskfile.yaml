@@ -1,0 +1,15 @@
+version: '3'
+
+tasks:
+  build:
+    cmds:
+    - go mod download
+    - go build -v -o main
+
+  image:
+    cmds:
+    - docker build -t ptah0/gotify-bark .
+
+  push:
+    cmds:
+    - docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 -t ptah0/gotify-bark --push .
