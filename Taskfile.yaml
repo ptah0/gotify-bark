@@ -1,15 +1,36 @@
 version: '3'
 
+vars:
+  NAME: gotify-bark
+  TAG: ptah0/{{.NAME}}
+  PLATFORM: linux/amd64,linux/arm64
+
 tasks:
-  build:
+
+  dev:
     cmds:
     - go mod download
     - go build -v -o main
+    - cmd: ./main
+      ignore_error: true
+
+  run:
+    deps:
+    - image
+    cmds:
+    - docker run {{.TAG}}
+
+  deploy:
+    deps:
+    - image
+    cmds:
+    - docker run -d --restart unless-stopped --name {{.NAME}} {{.TAG}}
 
   image:
     cmds:
-    - docker build -t ptah0/gotify-bark .
+    - docker buildx build -t {{.TAG}} --load .
 
   push:
     cmds:
-    - docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 -t ptah0/gotify-bark --push .
+    - docker buildx build -t {{.TAG}} --push --platform {{.PLATFORM}} .
+
