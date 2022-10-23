@@ -8,6 +8,7 @@ vars:
 tasks:
 
   dev:
+    desc: Build the binary.
     cmds:
     - go mod download
     - go build -v -o main
@@ -15,22 +16,26 @@ tasks:
       ignore_error: true
 
   run:
+    desc: Run the container image.
     deps:
     - image
     cmds:
     - docker run {{.TAG}}
 
   deploy:
+    desc: Deploy the container image (keep-running).
     deps:
     - image
     cmds:
     - docker run -d --restart unless-stopped --name {{.NAME}} {{.TAG}}
 
   image:
+    desc: Build the container image.
     cmds:
     - docker buildx build -t {{.TAG}} --load .
 
   push:
+    desc: Push to container registry.
     cmds:
     - docker buildx build -t {{.TAG}} --push --platform {{.PLATFORM}} .
 
