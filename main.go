@@ -3,8 +3,9 @@
 package main // import "github.com/ptah0/gotify-bark"
 
 import (
+    "os"
+
 	"github.com/ptah0/gotify-bark/core"
-	"os"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
