@@ -24,6 +24,9 @@ type Config struct {
 }
 
 func Run(cfg *Config) {
+	// Actuator
+	startActuator()
+
 	// Print out values
 	log.Info().
 		Str("GotifyUrl", cfg.GotifyUrl).
