@@ -1,8 +1,8 @@
 services:
 
   gotify-bark:
-    image: ptah0/gotify-bark
     container_name: gotify-bark
+    image: ptah0/gotify-bark
     restart: unless-stopped
     environment:
       - APP_GOTIFY_URL=wss://gotify.example.com

@@ -1,5 +1,5 @@
 # Builder Image
-FROM golang:1.19-alpine3.16 as builder
+FROM golang:1.20-alpine3.17 as builder
 # Build deps
 RUN apk --no-cache add git
 # Setup
@@ -10,12 +10,17 @@ RUN go mod download
 RUN go build -v -o main
 
 # Run Image
-FROM alpine:3.16
+FROM alpine:3.17
 # necessary binaries
-RUN apk add --no-cache bash curl file 
+RUN apk add --no-cache bash curl file
 # Setup
 WORKDIR /app
 COPY --from=builder /app/main /app/main
-# Run
+
+EXPOSE 8080/tcp
+VOLUME ["/app/data"]
+HEALTHCHECK --start-period=5s --interval=30s --timeout=5s --retries=5 \
+  CMD curl -f http://localhost:8080/status || exit 1
+#Run
 CMD ["/app/main"]
 
