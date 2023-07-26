@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package core // Package core import "github.com/ptah0/gotify-bark/core"
+package internal // Package internal import "github.com/ptah0/gotify-bark/internal"
 
 import (
 	"net/http"
 
 	"github.com/hellofresh/health-go/v5"
-	// healthHttp "github.com/hellofresh/health-go/v5/checks/http"
 	"github.com/rs/zerolog/log"
 )
 

@@ -16,8 +16,8 @@ tasks:
     desc: Build the binary.
     cmds:
     - go mod download
-    - go build -v -o main
-    - cmd: ./main
+    - go build -v -o gotify-bark ./cmd/gotify-bark
+    - cmd: ./gotify-bark
 
   run:
     desc: Run the container image.

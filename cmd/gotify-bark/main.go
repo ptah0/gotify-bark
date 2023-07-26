@@ -3,9 +3,9 @@
 package main // import "github.com/ptah0/gotify-bark"
 
 import (
-    "os"
+	"os"
 
-	"github.com/ptah0/gotify-bark/core"
+	"github.com/ptah0/gotify-bark/internal"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -13,7 +13,6 @@ import (
 )
 
 // Main
-
 func main() {
 	// Setup log
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
@@ -65,7 +64,7 @@ func main() {
 				zerolog.SetGlobalLevel(zerolog.DebugLevel)
 			}
 			// Run Core App
-			core.Run(&core.Config{
+			internal.Run(&internal.Config{
 				GotifyUrl:   c.String("gotify-url"),
 				GotifyKey:   c.String("gotify-key"),
 				BarkUrl:     c.String("bark-url"),

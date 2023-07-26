@@ -1,6 +1,6 @@
 module github.com/ptah0/gotify-bark
 
-go 1.18
+go 1.20
 
 require (
 	github.com/goccy/go-json v0.10.2
@@ -18,5 +18,5 @@ require (
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	go.opentelemetry.io/otel v1.16.0 // indirect
 	go.opentelemetry.io/otel/trace v1.16.0 // indirect
-	golang.org/x/sys v0.9.0 // indirect
+	golang.org/x/sys v0.10.0 // indirect
 )

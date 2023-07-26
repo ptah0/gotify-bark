@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package core // Package core import "github.com/ptah0/gotify-bark/core"
+package internal // Package internal import "github.com/ptah0/gotify-bark/internal"
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -128,7 +128,7 @@ func sendPush(msg []byte, barkUrl string, dev string) {
 		return
 	}
 	// Read response Body
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 
 	// handle error
 	switch resp.StatusCode {
