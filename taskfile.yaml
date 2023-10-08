@@ -1,45 +1,53 @@
-version: '3'
+# https://taskfile.dev
 
-dotenv:
-- .env
+version: '3'
 
 vars:
   NAME: gotify-bark
-  TAG: ptah0/{{.NAME}}
+  VERSION: latest
+  TAG: ptah0/{{.NAME}}:{{.VERSION}}
   PLATFORM: linux/amd64,linux/arm64
+
+dotenv:
+  - .env
 
 tasks:
   default:
     - cmd: task --list
 
   dev:
-    desc: Build the binary.
+    desc: Build and Run the binary locally.
     cmds:
-    - go mod download
-    - go build -v -o gotify-bark ./cmd/gotify-bark
-    - cmd: ./gotify-bark
+      - go mod download
+      - go build -v -o gotify-bark ./cmd/gotify-bark
+      - cmd: ./gotify-bark
+
+  cleanup:
+    desc: Remove previous docker container
+    cmds:
+      - docker rm -f -v {{.NAME}}
 
   run:
-    desc: Run the container image.
+    desc: Run gotify-bark in docker container.
     deps:
-    - image
+      - image
+      - cleanup
     cmds:
-    - docker run --env-file .env {{.TAG}}
+      - docker run --env-file .env --name {{.NAME}} {{.TAG}}
+
+  image:
+    desc: Build docker images
+    cmds:
+      - docker buildx build -t {{.TAG}} --load .
+
+  push:
+    desc: Build and Push docker image.
+    cmds:
+      - docker buildx build -t {{.TAG}} --push --platform {{.PLATFORM}} .
 
   deploy:
     desc: Deploy the container image (keep-running).
     deps:
-    - image
+      - cleanup
     cmds:
-    - docker run -d --restart unless-stopped --env-file .env --name {{.NAME}} {{.TAG}}
-
-  image:
-    desc: Build the container image.
-    cmds:
-    - docker buildx build -t {{.TAG}} --load .
-
-  push:
-    desc: Push to container registry.
-    cmds:
-    - docker buildx build -t {{.TAG}} --push --platform {{.PLATFORM}} .
-
+      - docker run -d --restart unless-stopped --env-file .env --name {{.NAME}} {{.TAG}}
