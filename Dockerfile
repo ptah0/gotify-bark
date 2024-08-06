@@ -1,5 +1,5 @@
 # Builder Image
-FROM golang:1.20-alpine3.18 as builder
+FROM golang:1.22-alpine3.20 AS builder
 # Build deps
 RUN apk --no-cache add git
 # Setup
@@ -10,7 +10,7 @@ RUN go mod download
 RUN go build -v -o gotify-bark ./cmd/gotify-bark
 
 # Run Image
-FROM alpine:3.18
+FROM alpine:3.20
 # necessary binaries
 RUN apk add --no-cache bash curl file
 # Setup
@@ -23,4 +23,3 @@ HEALTHCHECK --start-period=5s --interval=30s --timeout=5s --retries=5 \
   CMD curl -f http://localhost:8080/status || exit 1
 #Run
 CMD ["/app/gotify-bark"]
-
