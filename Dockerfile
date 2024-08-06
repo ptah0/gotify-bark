@@ -10,7 +10,7 @@ RUN go mod download
 RUN go build -v -o gotify-bark ./cmd/gotify-bark
 
 # Run Image
-FROM alpine:3.20
+FROM alpine:3.20 AS runtime
 # necessary binaries
 RUN apk add --no-cache bash curl file
 # Setup
