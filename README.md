@@ -2,6 +2,9 @@
 
 Forward Gotify messages to Bark or other notification services using [Shoutrrr](https://containrrr.dev/shoutrrr/v0.8/).
 
+See [development and runtime documentation](docs/README.md) and
+[repository guidance](AGENTS.md) for contributing.
+
 ## Configuration
 
 Set these environment variables (or copy `.env.example` to `.env` when using the Taskfile or Docker):
