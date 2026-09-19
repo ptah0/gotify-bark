@@ -3,57 +3,70 @@
 package internal // Package internal import "github.com/ptah0/gotify-bark/internal"
 
 import (
-	"bytes"
-	"io"
-	"net/http"
+	"errors"
+	"fmt"
 	"net/url"
 	"os"
 	"os/signal"
 	"time"
 
+	"github.com/containrrr/shoutrrr"
+	"github.com/containrrr/shoutrrr/pkg/router"
+	"github.com/containrrr/shoutrrr/pkg/types"
 	"github.com/goccy/go-json"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
 )
 
 type Config struct {
-	GotifyUrl   string
-	GotifyKey   string
-	BarkUrl     string
-	BarkDevices []string
+	GotifyUrl    string
+	GotifyKey    string
+	ShoutrrrURLs []string
 }
 
-func Run(cfg *Config) {
-	// Actuator
+func Run(cfg *Config) error {
+	if len(cfg.ShoutrrrURLs) == 0 {
+		return errors.New("at least one Shoutrrr URL is required")
+	}
+	for i, rawURL := range cfg.ShoutrrrURLs {
+		u, err := url.Parse(rawURL)
+		if err != nil || u.Scheme == "" {
+			return fmt.Errorf("invalid notification URL %d", i+1)
+		}
+		if u.Scheme == "bark" {
+			key, _ := u.User.Password()
+			if u.Hostname() == "" || key == "" {
+				return fmt.Errorf("Bark URL %d requires a host and device key", i+1)
+			}
+		}
+	}
+	sender, err := shoutrrr.CreateSender(cfg.ShoutrrrURLs...)
+	if err != nil {
+		// Library errors can include credentials from the URL.
+		return errors.New("invalid Shoutrrr configuration; check notification URLs")
+	}
 	startActuator()
-
-	// Print out values
-	log.Info().
-		Str("GotifyUrl", cfg.GotifyUrl).
-		Str("GotifyKey", cfg.GotifyKey).
-		Str("BarkUrl", cfg.BarkUrl).
-		Strs("BarkDevices", cfg.BarkDevices).
-		Msg("Read Config")
+	log.Info().Int("destinations", len(cfg.ShoutrrrURLs)).Msg("Read config")
 
 	// Handle os interrupt
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
+	defer signal.Stop(interrupt)
 
 	// Create url
 	u, err := url.Parse(cfg.GotifyUrl)
 	if err != nil {
-		log.Error().Err(err).Msg("Invalid Gotify Url")
-		return
+		return errors.New("invalid Gotify URL")
 	}
 	u.Path = "/stream"
 	q := url.Values{}
 	q.Set("token", cfg.GotifyKey)
 	u.RawQuery = q.Encode()
 	// Init websocket
-	log.Debug().Msgf("connecting to %s", u.String())
+	log.Debug().Msg("Connecting to Gotify")
 	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
-		log.Fatal().Err(err).Msg("dial")
+		return errors.New("failed to connect to Gotify")
 	}
 	defer c.Close()
 
@@ -66,10 +79,8 @@ func Run(cfg *Config) {
 				log.Debug().Err(err).Msg("read")
 				return
 			}
-			log.Debug().Bytes("Msg", m).Msg("recv")
-			// forward request to Bark
-			for _, d := range cfg.BarkDevices {
-				sendPush(m, cfg.BarkUrl, d)
+			if err := sendPush(m, sender); err != nil {
+				log.Warn().Err(err).Msg("Notification forwarding failed")
 			}
 		}
 	}()
@@ -77,7 +88,7 @@ func Run(cfg *Config) {
 	for {
 		select {
 		case <-done:
-			return
+			return nil
 		case <-interrupt:
 			log.Info().Msg("interrupt")
 
@@ -86,60 +97,35 @@ func Run(cfg *Config) {
 			err := c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 			if err != nil {
 				log.Info().Err(err).Msg("write close")
-				return
+				return nil
 			}
 			select {
 			case <-done:
 			case <-time.After(time.Second):
 			}
-			return
+			return nil
 		}
 	}
 }
 
-func sendPush(msg []byte, barkUrl string, dev string) {
-	// Convert msg: Gotify -> Bark
-	out := convertMsg(msg, dev)
-	log.Debug().Bytes("json", out).Msg("send")
-
-	// Create client
-	client := &http.Client{}
-
-	// Create url
-	u, err := url.Parse(barkUrl)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Bark Url Invalid")
-		return
+func sendPush(msg []byte, sender *router.ServiceRouter) error {
+	var in GotifyMsg
+	if err := json.Unmarshal(msg, &in); err != nil {
+		return errors.New("invalid Gotify message")
 	}
-	u.Path = "/push"
-	// Request
-	req, err := http.NewRequest("POST", u.String(), bytes.NewBuffer(out))
-	if err != nil {
-		log.Error().Err(err).Msg("Failure to POST")
-		return
+	params := types.Params{"title": in.Title}
+	failed := false
+	for _, err := range sender.Send(in.Message, &params) {
+		if err != nil {
+			// Delivery errors may contain credential-bearing URLs or response bodies.
+			log.Warn().Msg("Notification delivery failed")
+			failed = true
+		}
 	}
-	// Headers
-	req.Header.Add("Content-Type", "application/json; charset=utf-8")
-
-	// Fetch request
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Warn().Err(err).Msg("Failure to fetch request")
-		return
+	if failed {
+		return errors.New("one or more notification deliveries failed")
 	}
-	// Read response Body
-	body, _ := io.ReadAll(resp.Body)
-
-	// handle error
-	switch resp.StatusCode {
-	case 400:
-		log.Error().Str("body", string(body)).Msg("Bad Request")
-	}
-
-	// display results
-	log.Info().Msgf("response Status : ", resp.Status)
-	log.Debug().Msgf("response Headers : ", resp.Header)
-	log.Debug().Msgf("response Body : ", string(body))
+	return nil
 }
 
 type GotifyMsg struct {
@@ -147,34 +133,4 @@ type GotifyMsg struct {
 	Message  string    `json:"message"`
 	Priority int       `json:"priority"`
 	Date     time.Time `json:"date"`
-}
-
-type BarkMsg struct {
-	DeviceKey string `json:"device_key"`
-	Category  string `json:"category"`
-	Title     string `json:"title"`
-	Body      string `json:"body"`
-	Badge     int    `json:"badge"`
-}
-
-func convertMsg(m []byte, d string) []byte {
-	// Parse Gotify msg
-	var in GotifyMsg
-	err := json.Unmarshal(m, &in)
-	if err != nil {
-		log.Warn().Err(err).Msg("Parse Gotify message")
-	}
-	// Gen Bark msg
-	out, err := json.Marshal(&BarkMsg{
-		DeviceKey: d,
-		Category:  "category",
-		Title:     in.Title,
-		Body:      in.Message,
-		Badge:     int(1),
-	})
-	if err != nil {
-		log.Warn().Err(err).Msg("Generate Bark message")
-	}
-
-	return out
 }

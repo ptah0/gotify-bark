@@ -23,7 +23,7 @@ func main() {
 	// Cli
 	cmd := &cli.Command{
 		Name:  "main",
-		Usage: "Gotify Bark Forwarder",
+		Usage: "Gotify notification forwarder",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "gotify-url",
@@ -39,18 +39,10 @@ func main() {
 				Sources:  cli.EnvVars("APP_GOTIFY_KEY"),
 				Required: true,
 			},
-			&cli.StringFlag{
-				Name:    "bark-url",
-				Aliases: []string{"b"},
-				Value:   "https://api.day.app",
-				Usage:   "Gotify server URL",
-				Sources: cli.EnvVars("APP_BARK_URL"),
-			},
 			&cli.StringSliceFlag{
-				Name:     "bark-device",
-				Aliases:  []string{"d"},
-				Usage:    "Bark notification device(s)",
-				Sources:  cli.EnvVars("APP_BARK_DEVICE"),
+				Name:     "shoutrrr-url",
+				Usage:    "Notification URL (repeat flag or use comma-separated URLs)",
+				Sources:  cli.EnvVars("APP_SHOUTRRR_URLS"),
 				Required: true,
 			},
 			&cli.BoolFlag{
@@ -65,13 +57,11 @@ func main() {
 				zerolog.SetGlobalLevel(zerolog.DebugLevel)
 			}
 			// Run Core App
-			internal.Run(&internal.Config{
-				GotifyUrl:   c.String("gotify-url"),
-				GotifyKey:   c.String("gotify-key"),
-				BarkUrl:     c.String("bark-url"),
-				BarkDevices: c.StringSlice("bark-device"),
+			return internal.Run(&internal.Config{
+				GotifyUrl:    c.String("gotify-url"),
+				GotifyKey:    c.String("gotify-key"),
+				ShoutrrrURLs: c.StringSlice("shoutrrr-url"),
 			})
-			return nil
 		},
 	}
 
