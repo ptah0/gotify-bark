@@ -2,13 +2,14 @@ package internal
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
-	"github.com/containrrr/shoutrrr"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -43,19 +44,24 @@ func TestForwardNotifications(t *testing.T) {
 	destination := func(key string) string {
 		return "bark://:" + key + "@" + strings.TrimPrefix(server.URL, "http://") + "/prefix/?scheme=http&badge=1&category=category"
 	}
-	sender, err := shoutrrr.CreateSender(destination("first"), destination("second"))
+	sender, err := newSenders([]string{destination("first"), destination("second")})
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Reuse the sender to ensure an empty title clears the previous title.
 	for _, title := range []string{"Hello 世界", ""} {
 		message, _ := json.Marshal(GotifyMsg{Title: title, Message: "Body & details"})
-		if err := sendPush(message, sender); err != nil {
+		if err := sendPush(context.Background(), message, sender); err != nil {
 			t.Fatal(err)
 		}
 		seen := map[string]bool{}
 		for range 2 {
-			p := <-received
+			var p payload
+			select {
+			case p = <-received:
+			case <-time.After(time.Second):
+				t.Fatal("notification was not delivered")
+			}
 			if p.Title != title || p.Body != "Body & details" || p.Badge != 1 || p.Category != "category" {
 				t.Fatalf("unexpected payload: %+v", p)
 			}
@@ -65,14 +71,14 @@ func TestForwardNotifications(t *testing.T) {
 			t.Fatalf("missing destination: %v", seen)
 		}
 	}
-	if err := sendPush([]byte(`{"title":`), sender); err == nil {
+	if err := sendPush(context.Background(), []byte(`{"title":`), sender); err == nil {
 		t.Fatal("malformed input accepted")
 	}
 	if len(received) != 0 {
 		t.Fatal("malformed message was delivered")
 	}
 
-	sender, err = shoutrrr.CreateSender(destination("failure-secret"), destination("second"))
+	sender, err = newSenders([]string{destination("failure-secret"), destination("second")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +86,7 @@ func TestForwardNotifications(t *testing.T) {
 	oldLogger := log.Logger
 	log.Logger = zerolog.New(&logs)
 	defer func() { log.Logger = oldLogger }()
-	err = sendPush([]byte(`{"title":"Test","message":"Body"}`), sender)
+	err = sendPush(context.Background(), []byte(`{"title":"Test","message":"Body"}`), sender)
 	if err == nil {
 		t.Fatal("delivery failure was ignored")
 	}
@@ -94,12 +100,42 @@ func TestForwardNotifications(t *testing.T) {
 
 func TestInvalidNotificationConfig(t *testing.T) {
 	for _, urls := range [][]string{nil, {""}, {"://secret"}, {"unknown://secret@host"}, {"bark://host"}, {"bark://:secret@/"}, {"bark://:secret@host/?badge=invalid"}} {
-		err := Run(&Config{ShoutrrrURLs: urls})
+		_, err := newSenders(urls)
 		if err == nil {
 			t.Fatalf("configuration accepted: %v", urls)
 		}
 		if strings.Contains(err.Error(), "secret") {
 			t.Fatalf("credential leaked: %v", err)
 		}
+	}
+}
+
+func TestGenericNotification(t *testing.T) {
+	received := make(chan GotifyMsg, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/hook" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		var msg GotifyMsg
+		if err := json.NewDecoder(r.Body).Decode(&msg); err != nil {
+			t.Error(err)
+		}
+		received <- msg
+	}))
+	defer server.Close()
+	senders, err := newSenders([]string{"generic://" + strings.TrimPrefix(server.URL, "http://") + "/hook?disabletls=yes&template=json"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sendPush(context.Background(), []byte(`{"title":"Title","message":"Body"}`), senders); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case msg := <-received:
+		if msg.Title != "Title" || msg.Message != "Body" {
+			t.Fatalf("unexpected notification: %+v", msg)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("notification was not delivered")
 	}
 }

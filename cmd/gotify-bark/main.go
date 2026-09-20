@@ -5,6 +5,8 @@ package main // import "github.com/ptah0/gotify-bark"
 import (
 	"context"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/ptah0/gotify-bark/internal"
 
@@ -52,20 +54,21 @@ func main() {
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
-			// Debug
 			if c.Bool("debug") {
 				zerolog.SetGlobalLevel(zerolog.DebugLevel)
 			}
 			// Run Core App
-			return internal.Run(&internal.Config{
-				GotifyUrl:    c.String("gotify-url"),
+			return internal.Run(ctx, internal.Config{
+				GotifyURL:    c.String("gotify-url"),
 				GotifyKey:    c.String("gotify-key"),
 				ShoutrrrURLs: c.StringSlice("shoutrrr-url"),
 			})
 		},
 	}
 
-	err := cmd.Run(context.Background(), os.Args)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	err := cmd.Run(ctx, os.Args)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failure to run cmd")
 	}

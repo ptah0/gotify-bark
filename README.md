@@ -16,6 +16,9 @@ APP_SHOUTRRR_URLS=bark://:DEVICE_KEY@api.day.app/?badge=1&category=category
 ```
 
 Use a Gotify **client token** to subscribe to messages. The binary reads environment variables; it does not load `.env` itself.
+Set `APP_DEBUG=true` or pass `--debug` to enable debug logging.
+The Gotify URL must use `ws://` or `wss://`. A base path such as
+`wss://gotify.example.com/gotify` is supported; the subscription uses `/gotify/stream`.
 
 For multiple devices, separate notification URLs with commas:
 
@@ -44,6 +47,20 @@ go run ./cmd/gotify-bark \
 ```
 
 Gotify's body is sent as the notification message and its title as Shoutrrr's `title` parameter. Title support depends on the destination service. Malformed messages are skipped; delivery failures are logged without credentials and are not retried. `/status` remains available on port 8080.
+
+Messages are forwarded sequentially, with destinations for each message sent concurrently.
+A delivery exceeding 10 seconds logs an error and processing continues. Shoutrrr
+providers cannot cancel sends: a timed-out delivery may still complete, and further
+messages skip that destination while it remains busy. Other destinations continue.
+Failed connections and unexpected Gotify disconnects log sanitized errors and retry
+every second. Messages missed while disconnected are not replayed.
+`SIGINT` and `SIGTERM` stop the service and close its WebSocket and status listener.
+`/status` uses `health-go` with system information and two checks: `gotify` reports
+the observed WebSocket connection state; `notifications` reports the latest completed
+delivery result across all destinations. Either failure returns HTTP 503. A subsequent
+successful delivery to all destinations clears the delivery failure. Before the first
+delivery, that check passes; malformed messages do not change it. These checks do not
+send test notifications or actively probe idle connections or provider availability.
 
 ## Migration
 

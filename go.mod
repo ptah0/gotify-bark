@@ -4,7 +4,6 @@ go 1.27
 
 require (
 	github.com/containrrr/shoutrrr v0.8.0
-	github.com/goccy/go-json v0.10.6
 	github.com/gorilla/websocket v1.5.3
 	github.com/hellofresh/health-go/v5 v5.5.5
 	github.com/rs/zerolog v1.35.1
@@ -19,4 +18,5 @@ require (
 	go.opentelemetry.io/otel v1.46.0 // indirect
 	go.opentelemetry.io/otel/trace v1.46.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 )
