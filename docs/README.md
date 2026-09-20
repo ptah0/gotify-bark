@@ -1,7 +1,7 @@
 # Development and runtime
 
-See the [project README](../README.md) for configuration, notification URL
-examples, and migration instructions. Contributor and agent conventions live in
+See the [project README](../README.md) for configuration and notification URL
+examples. Contributor and agent conventions live in
 [AGENTS.md](../AGENTS.md).
 
 ## Local development
