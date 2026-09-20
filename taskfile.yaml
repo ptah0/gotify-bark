@@ -18,7 +18,6 @@ tasks:
   dev:
     desc: Build and Run the binary locally.
     cmds:
-      - go mod download
       - go build -v -o gotify-bark ./cmd/gotify-bark
       - cmd: ./gotify-bark
 

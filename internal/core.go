@@ -13,9 +13,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/containrrr/shoutrrr/pkg/router"
-	"github.com/containrrr/shoutrrr/pkg/types"
 	"github.com/gorilla/websocket"
+	"github.com/nicholas-fedor/shoutrrr/pkg/router"
+	"github.com/nicholas-fedor/shoutrrr/pkg/types"
 	"github.com/rs/zerolog/log"
 )
 
@@ -52,7 +52,53 @@ func run(ctx context.Context, cfg Config, statusAddr string) error {
 		return err
 	}
 	defer status.Close()
-	log.Info().Int("destinations", len(senders)).Msg("Read config")
+	// Log only safe URL components; paths and queries can also contain credentials.
+	gotify, _ := url.Parse(u) // Already validated by streamURL.
+	services := make([]string, len(cfg.ShoutrrrURLs))
+	for i, rawURL := range cfg.ShoutrrrURLs {
+		destination, _ := url.Parse(rawURL) // Already validated by newSenders.
+		destination.Scheme = strings.ToLower(destination.Scheme)
+		// Other providers can store tokens or webhook IDs in the URL host.
+		switch destination.Scheme {
+		case "bark", "generic", "smtp", "ntfy", "gotify", "zulip", "mattermost", "googlechat", "opsgenie", "matrix", "rocketchat":
+		default:
+			destination.Host = "REDACTED"
+		}
+		if destination.User != nil {
+			username := destination.User.Username()
+			if username != "" {
+				username = "REDACTED"
+			}
+			if _, hasPassword := destination.User.Password(); hasPassword {
+				destination.User = url.UserPassword(username, "REDACTED")
+			} else {
+				destination.User = url.User(username)
+			}
+		}
+		if destination.Path != "" && destination.Path != "/" {
+			destination.Path = "/REDACTED"
+		}
+		destination.RawPath = ""
+		if destination.RawQuery != "" {
+			destination.RawQuery = "REDACTED"
+		}
+		if destination.Fragment != "" {
+			destination.Fragment = "REDACTED"
+			destination.RawFragment = ""
+		}
+		if destination.Opaque != "" {
+			destination.Opaque = "REDACTED"
+		}
+		services[i] = destination.String()
+	}
+	log.Info().
+		Str("gotify_host", gotify.Host).
+		Str("gotify_transport", gotify.Scheme).
+		Int("destinations", len(senders)).
+		Strs("services", services).
+		Str("status_addr", status.Addr).
+		Str("status_path", "/status").
+		Msg("Read config")
 
 	done := make(chan struct{})
 	go func() {
@@ -86,6 +132,7 @@ func reconnect(ctx context.Context, u string, senders []types.Sender, state *hea
 			err = errors.New("failed to connect to Gotify")
 		} else {
 			state.connected.Store(true)
+			log.Info().Msg("Connected to Gotify")
 			stop := context.AfterFunc(ctx, func() {
 				_ = c.WriteControl(websocket.CloseMessage,
 					websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), time.Now().Add(time.Second))
@@ -149,7 +196,7 @@ func newSenders(urls []string) ([]types.Sender, error) {
 	return senders, nil
 }
 
-// Providers cannot cancel sends; skip a busy destination until its previous send returns.
+// The Sender API cannot cancel sends; skip a busy destination until its previous send returns.
 type guardedSender struct {
 	types.Sender
 	busy atomic.Bool
@@ -194,7 +241,7 @@ func sendPush(ctx context.Context, msg []byte, senders []types.Sender) error {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	// Bypass Shoutrrr v0.8.0's unbuffered timeout channel. Late results must not block.
+	// Bound delivery across all destinations; late provider results must not block.
 	results := make(chan error, len(senders))
 	for _, sender := range senders {
 		go func() {

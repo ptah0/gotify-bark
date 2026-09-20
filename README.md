@@ -1,6 +1,6 @@
 # gotify-bark
 
-Forward Gotify messages to Bark or other notification services using [Shoutrrr](https://containrrr.dev/shoutrrr/v0.8/).
+Forward Gotify messages to Bark or other notification services using the maintained [Shoutrrr fork](https://github.com/nicholas-fedor/shoutrrr).
 
 See [development and runtime documentation](docs/README.md) and
 [repository guidance](AGENTS.md) for contributing.
@@ -33,7 +33,7 @@ APP_SHOUTRRR_URLS=bark://:DEVICE_KEY@bark.example.com/?badge=1&category=category
 ```
 
 HTTPS is the default. For an HTTP server, add `&scheme=http`. A server path prefix can go before `?`.
-Bark options such as `sound`, `group`, and `icon` go in the query string; see the [Bark URL documentation](https://containrrr.dev/shoutrrr/v0.8/services/bark/).
+Bark options such as `sound`, `group`, and `icon` go in the query string; see the [Bark URL documentation](https://github.com/nicholas-fedor/shoutrrr/blob/v0.21.0/docs/services/push/bark/index.md).
 URL-encode reserved characters in keys and option values, including literal commas (`%2C`). Treat notification URLs as secrets.
 
 Alternatively, repeat the CLI flag (quote URLs to protect `&` from the shell):
@@ -49,8 +49,8 @@ go run ./cmd/gotify-bark \
 Gotify's body is sent as the notification message and its title as Shoutrrr's `title` parameter. Title support depends on the destination service. Malformed messages are skipped; delivery failures are logged without credentials and are not retried. `/status` remains available on port 8080.
 
 Messages are forwarded sequentially, with destinations for each message sent concurrently.
-A delivery exceeding 10 seconds logs an error and processing continues. Shoutrrr
-providers cannot cancel sends: a timed-out delivery may still complete, and further
+A delivery exceeding 10 seconds logs an error and processing continues. The Shoutrrr
+`Sender` API used here cannot cancel sends: a timed-out delivery may still complete, and further
 messages skip that destination while it remains busy. Other destinations continue.
 Failed connections and unexpected Gotify disconnects log sanitized errors and retry
 every second. Messages missed while disconnected are not replayed.

@@ -44,9 +44,9 @@ modules, builds the binary, and runs it. Docker Compose uses `deploy/.env`.
    Delivery errors are sanitized to avoid exposing credentials. Destinations are sent
    concurrently; each message completes or times out before the next is forwarded.
 5. A delivery exceeding 10 seconds logs a sanitized error and processing continues.
-   Delivery uses Shoutrrr's provider API directly, bypassing v0.8.0's leaking router
-   timeout wrapper. Buffered results allow late sends to finish. Providers have no
-   cancellation API; subsequent messages skip a busy destination until it finishes.
+   Delivery uses the maintained Shoutrrr fork's `Sender` API directly, with a shared
+   deadline across destinations. Buffered results allow late sends to finish. This API
+   does not support cancellation; subsequent messages skip a busy destination until it finishes.
    Failed connections and unexpected disconnects log sanitized errors and reconnect
    every second, keeping the status server running.
 6. Cancellation interrupts dialing and forwarding, requests a WebSocket close with a

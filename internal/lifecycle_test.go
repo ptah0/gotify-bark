@@ -16,8 +16,8 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/containrrr/shoutrrr/pkg/types"
 	"github.com/gorilla/websocket"
+	"github.com/nicholas-fedor/shoutrrr/pkg/types"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -190,11 +190,37 @@ func TestRunDisconnectRetriesSafely(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	err := run(ctx, Config{
-		GotifyURL: "ws" + strings.TrimPrefix(gotify.URL, "http"), GotifyKey: "token-secret",
-		ShoutrrrURLs: []string{"bark://:device-secret@localhost"},
+		GotifyURL: "ws" + strings.TrimPrefix(gotify.URL, "http") + "/path-secret?extra=query-secret", GotifyKey: "token-secret",
+		ShoutrrrURLs: []string{
+			"bark://:device-secret@localhost:8443/path%2Dsecret?url=https%3A%2F%2Fquery-secret#fragment-secret",
+			"bark://:device-secret@[::1]:9443/path-secret",
+			"generic://user-secret:password-secret@localhost/path-secret?disabletls=yes",
+			"pushbullet://" + strings.Repeat("x", 28) + "secret",
+		},
 	}, "127.0.0.1:0")
 	if err != nil || attempts.Load() < 3 || !strings.Contains(logs.String(), "retrying") || strings.Contains(logs.String(), "secret") {
 		t.Fatalf("expected safe retries, got %v, attempts %d, logs %s", err, attempts.Load(), logs.String())
+	}
+	var startup struct {
+		Host       string   `json:"gotify_host"`
+		Transport  string   `json:"gotify_transport"`
+		Count      int      `json:"destinations"`
+		Services   []string `json:"services"`
+		StatusAddr string   `json:"status_addr"`
+		StatusPath string   `json:"status_path"`
+	}
+	if err := json.NewDecoder(strings.NewReader(logs.String())).Decode(&startup); err != nil {
+		t.Fatal(err)
+	}
+	wantServices := "bark://:REDACTED@localhost:8443/REDACTED?REDACTED#REDACTED,bark://:REDACTED@[::1]:9443/REDACTED,generic://REDACTED:REDACTED@localhost/REDACTED?REDACTED,pushbullet://REDACTED"
+	if startup.Host != strings.TrimPrefix(gotify.URL, "http://") || startup.Transport != "ws" || startup.Count != 4 || strings.Join(startup.Services, ",") != wantServices || startup.StatusPath != "/status" {
+		t.Fatalf("unexpected startup details: %+v", startup)
+	}
+	if _, port, err := net.SplitHostPort(startup.StatusAddr); err != nil || port == "0" {
+		t.Fatalf("expected bound status address, got %q", startup.StatusAddr)
+	}
+	if !strings.Contains(logs.String(), "Connected to Gotify") {
+		t.Fatal("missing successful connection log")
 	}
 }
 
