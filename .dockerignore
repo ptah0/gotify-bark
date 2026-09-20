@@ -1,0 +1,11 @@
+.git
+.github
+.idea
+.env
+.env.*
+**/.env
+**/.env.*
+gotify-bark
+dist
+*.test
+*.out
