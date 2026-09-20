@@ -57,7 +57,6 @@ jobs:
             ${{ steps.names.outputs.ghcr }}
             ${{ steps.names.outputs.dockerhub }}
           tags: |
-            type=sha
             type=semver,pattern={{version}}
           flavor: |
             latest=auto
