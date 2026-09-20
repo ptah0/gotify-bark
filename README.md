@@ -62,12 +62,6 @@ successful delivery to all destinations clears the delivery failure. Before the 
 delivery, that check passes; malformed messages do not change it. These checks do not
 send test notifications or actively probe idle connections or provider availability.
 
-## Migration
-
-Replace `APP_BARK_URL` and `APP_BARK_DEVICE` with `APP_SHOUTRRR_URLS`, using one URL per device. The old variables and `--bark-url`/`--bark-device` flags are no longer supported. Include `badge=1&category=category` to preserve the previous Bark defaults.
-
-For Docker Compose, place the updated environment file at `deploy/.env` and recreate the container after building or obtaining the updated image. Verify a Gotify message reaches each configured device.
-
 ## Checks
 
 ```sh

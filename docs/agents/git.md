@@ -18,5 +18,5 @@ Examples:
 ```text
 docs: add agent workflow guidance
 fix(forwarding): preserve notification titles
-feat(config)!: replace legacy Bark flags with Shoutrrr URLs
+feat(config)!: require APP_SHOUTRRR_URLS instead of a single device key
 ```
