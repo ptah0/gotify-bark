@@ -2,7 +2,10 @@ name: Build and release
 
 on:
   pull_request:
+    branches: [main]
   push:
+    branches: [main]
+    tags: ['v*']
 
 permissions:
   contents: read
@@ -41,10 +44,10 @@ jobs:
         id: names
         env:
           REPOSITORY: ${{ github.repository }}
-          DOCKERHUB_IMAGE: ${{ vars.DOCKERHUB_IMAGE || 'ptah0/gotify-bark' }}
+          DOCKERHUB_IMAGE: ${{ vars.DOCKERHUB_IMAGE }}
         run: |
           echo "ghcr=ghcr.io/${REPOSITORY,,}" >> "$GITHUB_OUTPUT"
-          echo "dockerhub=$DOCKERHUB_IMAGE" >> "$GITHUB_OUTPUT"
+          echo "dockerhub=${DOCKERHUB_IMAGE:-${REPOSITORY,,}}" >> "$GITHUB_OUTPUT"
       - uses: docker/metadata-action@v6
         id: meta
         with:

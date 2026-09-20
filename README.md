@@ -77,19 +77,22 @@ go build ./cmd/gotify-bark
 
 ## CI and releases
 
-[Build and release](.github/workflows/build.yml) runs on every push and pull
-request. It checks Go formatting, runs `go vet` and race-enabled tests, builds
-the binary, and builds the Docker image for Linux amd64 and arm64. Branch and
-pull-request builds do not publish anything. Dependabot checks Actions updates
-monthly.
+[Build and release](.github/workflows/build.yml) builds pull requests targeting
+`main` when opened, updated, or reopened, and on every push to `main`, including
+PR merges and direct pushes. Version-tag pushes (`v*`) also trigger the workflow
+for releases. It checks Go formatting, runs
+`go vet` and race-enabled tests, builds the binary, and builds the Docker image
+for Linux amd64 and arm64. Pull-request and `main` builds do not publish anything.
+Dependabot checks Actions updates monthly.
 
 Before the first release, configure the repository in GitHub Settings:
 
 - Under **Secrets and variables → Actions**, add `DOCKERHUB_USERNAME` and
   `DOCKERHUB_TOKEN` secrets. Use a Docker Hub access token with write permission
-  to the `ptah0/gotify-bark` repository.
-- If publishing to another Docker Hub repository, set the `DOCKERHUB_IMAGE`
-  repository variable to its full name, such as `your-account/gotify-bark`.
+  to the target Docker Hub repository.
+- Docker Hub defaults to the lowercase GitHub owner/repository name. To override
+  it, set the `DOCKERHUB_IMAGE` repository variable to the full image name, such
+  as `your-account/gotify-bark`.
 - GHCR and GitHub Releases use the built-in `GITHUB_TOKEN`; no personal access
   token is needed. Organization policies must allow the workflow to write
   repository contents and packages. For an existing GHCR package, grant this
@@ -105,8 +108,9 @@ git push origin v1.2.3
 ```
 
 Supported tags are `vMAJOR.MINOR.PATCH`, optionally followed by `-alpha.N`,
-`-beta.N`, or `-rc.N` (for example, `v1.2.3-rc.1`). Other tag formats fail
-validation. After checks pass, the workflow publishes:
+`-beta.N`, or `-rc.N` (for example, `v1.2.3-rc.1`). Other tags starting with `v`
+fail validation; tags without that prefix do not trigger the workflow.
+After checks pass, the workflow publishes:
 
 - Multi-platform images to `ptah0/gotify-bark` and
   `ghcr.io/ptah0/gotify-bark`, tagged with the version without `v` and a short
@@ -115,7 +119,8 @@ validation. After checks pass, the workflow publishes:
   and `checksums.txt`. Prerelease tags create GitHub prereleases.
 
 For example, pull `ghcr.io/ptah0/gotify-bark:1.2.3` or
-`ptah0/gotify-bark:1.2.3`. GHCR uses the current GitHub repository name in forks.
+`ptah0/gotify-bark:1.2.3`. In forks, both registries default to the lowercase
+GitHub owner/repository name; `DOCKERHUB_IMAGE` overrides only Docker Hub.
 Publishing a release manually in the GitHub UI does not trigger this workflow;
 the tag push is the release trigger. Push stable releases in ascending version
 order because each stable tag updates the image's `latest` tag.
